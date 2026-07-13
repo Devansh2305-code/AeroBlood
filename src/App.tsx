@@ -14,7 +14,7 @@ import AuthGatewayModal from './components/AuthGatewayModal';
 import { motion, AnimatePresence } from 'motion/react';
 import { 
   Compass, Building2, Droplet, Users, LayoutDashboard, 
-  Tv, MonitorDot, Sparkles, AlertCircle, HelpCircle, ArrowRight, Lock
+  Sparkles, AlertCircle, HelpCircle, ArrowRight, Lock
 } from 'lucide-react';
 
 export default function App() {
@@ -27,11 +27,6 @@ export default function App() {
   const [authDefaultRole, setAuthDefaultRole] = useState<UserRole>('donor');
   const [authDefaultTab, setAuthDefaultTab] = useState<'login' | 'register'>('login');
   
-  // Dual-screen simulator state (to show real-time synchronization visually)
-  const [dualScreenMode, setDualScreenMode] = useState(false);
-  const [leftRole, setLeftRole] = useState<UserRole>('hospital');
-  const [rightRole, setRightRole] = useState<UserRole>('blood_bank');
-
   // Change page title dynamically and check URL for passport lookup
   useEffect(() => {
     document.title = "AeroBlood - Connecting Blood. Saving Lives.";
@@ -48,8 +43,6 @@ export default function App() {
   const handleStartPortal = (roleSelection?: UserRole) => {
     if (roleSelection) {
       setRole(roleSelection);
-      if (roleSelection === 'hospital') setLeftRole('hospital');
-      if (roleSelection === 'donor') setRightRole('donor');
     }
     setShowLanding(false);
   };
@@ -104,10 +97,10 @@ export default function App() {
             </div>
           ) : (
             <>
-              {/* Sandbox mode instructions / badge */}
+              {/* Dynamic status indicator */}
               <div className="flex items-center gap-2 bg-slate-100 border border-slate-200/60 px-3 py-1.5 rounded-xl text-[11px] font-medium text-slate-600">
-                <Sparkles className="w-4 h-4 text-brand-red-600" />
-                <span>Interactive Simulator Mode</span>
+                <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+                <span>National Grid Live</span>
               </div>
 
               {/* Primary workspace layout switchers */}
@@ -127,20 +120,6 @@ export default function App() {
                 </button>
 
                 <button
-                  id="toggle-dual-mode"
-                  onClick={() => setDualScreenMode(!dualScreenMode)}
-                  className={`px-3 py-2 rounded-lg border text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer ${
-                    dualScreenMode 
-                      ? 'bg-slate-900 text-white border-slate-900 shadow' 
-                      : 'bg-white text-slate-700 border-slate-200 hover:bg-slate-50'
-                  }`}
-                  title="Split screen layout to observe instant real-time synchronization between portals"
-                >
-                  <Tv className="w-4 h-4" />
-                  <span>{dualScreenMode ? 'Single Screen View' : 'Split Sandbox (Realtime Demo)'}</span>
-                </button>
-
-                <button
                   id="back-to-landing-btn"
                   onClick={() => setShowLanding(true)}
                   className="px-3 py-2 border border-slate-200 hover:bg-slate-50 text-slate-700 rounded-lg text-xs font-bold transition-all cursor-pointer"
@@ -154,7 +133,7 @@ export default function App() {
       </header>
 
       {/* Role Navigation and Controller (Only shown in single view mode, and not in public lookup) */}
-      {!dualScreenMode && !lookupPassportId && (
+      {!lookupPassportId && (
         <div className="bg-slate-100/80 border-b border-slate-200 px-4 py-2.5">
           <div className="max-w-7xl mx-auto flex flex-wrap items-center justify-between gap-3 text-xs">
             <span className="font-bold text-slate-500 uppercase tracking-wider text-[10px]">Select Portal Node:</span>
@@ -215,178 +194,6 @@ export default function App() {
               window.history.replaceState({}, '', window.location.pathname);
             }} 
           />
-        ) : dualScreenMode ? (
-          /* Split Screen Real-time Synchronization Sandbox Layout */
-          <div className="space-y-6">
-            
-            {/* Sandbox explanation bar */}
-            <div className="p-4 bg-indigo-50 border border-indigo-100 rounded-xl flex items-start gap-3 text-xs text-indigo-900 shadow-xs">
-              <MonitorDot className="w-6 h-6 text-indigo-600 shrink-0 mt-0.5 animate-pulse" />
-              <div>
-                <h4 className="font-bold">Real-time Dual Device Synchronization Environment</h4>
-                <p className="text-indigo-700 mt-1 leading-relaxed">
-                  Try raising an <strong>Emergency SOS</strong> from the Hospital Panel on the Left. Watch it instantly propagate to the Blood Bank inventories, Donor pledges, maps, and system logs on the Right. No page refresh is required!
-                </p>
-              </div>
-            </div>
-
-            <div className="grid grid-cols-1 xl:grid-cols-2 gap-6 items-start">
-              
-              {/* Left Screen Device Column */}
-              <div id="sandbox-left-device" className="bg-slate-100 p-4 rounded-2xl border-4 border-slate-800 shadow-2xl relative">
-                <div className="absolute top-0 left-1/2 -translate-x-1/2 -translate-y-2 bg-slate-800 text-white text-[9px] font-bold px-4 py-0.5 rounded-b-md tracking-widest uppercase z-10">
-                  DEVICE ALPHA
-                </div>
-                
-                {/* Left Selector */}
-                <div className="flex items-center justify-between pb-3 border-b border-slate-200/60 mb-4 text-xs font-bold text-slate-700">
-                  <span>Acting as:</span>
-                  <select 
-                    value={leftRole} 
-                    onChange={(e) => setLeftRole(e.target.value as any)}
-                    className="bg-white border border-slate-300 p-1.5 rounded focus:outline-none"
-                  >
-                    <option value="hospital">Hospital Terminal</option>
-                    <option value="super_admin">National Grid</option>
-                    <option value="blood_bank">Blood Bank Manager</option>
-                    <option value="donor">Donor Portal</option>
-                  </select>
-                </div>
-
-                {/* Left Component Render */}
-                <div className="space-y-4 max-h-[700px] overflow-y-auto pr-1">
-                  <AnimatePresence mode="wait">
-                    {leftRole === 'super_admin' && (
-                      <motion.div
-                        key="left-super_admin"
-                        initial={{ opacity: 0, y: 10 }}
-                        animate={{ opacity: 1, y: 0 }}
-                        exit={{ opacity: 0, y: -10 }}
-                        transition={{ duration: 0.2, ease: "easeOut" }}
-                      >
-                        <NationalDashboard />
-                      </motion.div>
-                    )}
-                    {leftRole === 'hospital' && (
-                      <motion.div
-                        key="left-hospital"
-                        initial={{ opacity: 0, y: 10 }}
-                        animate={{ opacity: 1, y: 0 }}
-                        exit={{ opacity: 0, y: -10 }}
-                        transition={{ duration: 0.2, ease: "easeOut" }}
-                      >
-                        <HospitalDashboard />
-                      </motion.div>
-                    )}
-                    {leftRole === 'blood_bank' && (
-                      <motion.div
-                        key="left-blood_bank"
-                        initial={{ opacity: 0, y: 10 }}
-                        animate={{ opacity: 1, y: 0 }}
-                        exit={{ opacity: 0, y: -10 }}
-                        transition={{ duration: 0.2, ease: "easeOut" }}
-                      >
-                        <BloodBankDashboard />
-                      </motion.div>
-                    )}
-                    {leftRole === 'donor' && (
-                      <motion.div
-                        key="left-donor"
-                        initial={{ opacity: 0, y: 10 }}
-                        animate={{ opacity: 1, y: 0 }}
-                        exit={{ opacity: 0, y: -10 }}
-                        transition={{ duration: 0.2, ease: "easeOut" }}
-                      >
-                        <DonorDashboard />
-                      </motion.div>
-                    )}
-                  </AnimatePresence>
-                </div>
-              </div>
-
-              {/* Right Screen Device Column */}
-              <div id="sandbox-right-device" className="bg-slate-100 p-4 rounded-2xl border-4 border-slate-800 shadow-2xl relative">
-                <div className="absolute top-0 left-1/2 -translate-x-1/2 -translate-y-2 bg-slate-800 text-white text-[9px] font-bold px-4 py-0.5 rounded-b-md tracking-widest uppercase z-10">
-                  DEVICE BETA
-                </div>
-                
-                {/* Right Selector */}
-                <div className="flex items-center justify-between pb-3 border-b border-slate-200/60 mb-4 text-xs font-bold text-slate-700">
-                  <span>Acting as:</span>
-                  <select 
-                    value={rightRole} 
-                    onChange={(e) => setRightRole(e.target.value as any)}
-                    className="bg-white border border-slate-300 p-1.5 rounded focus:outline-none"
-                  >
-                    <option value="blood_bank">Blood Bank Manager</option>
-                    <option value="donor">Donor Portal</option>
-                    <option value="super_admin">National Grid</option>
-                    <option value="hospital">Hospital Terminal</option>
-                  </select>
-                </div>
-
-                {/* Right Component Render */}
-                <div className="space-y-4 max-h-[700px] overflow-y-auto pr-1">
-                  <AnimatePresence mode="wait">
-                    {rightRole === 'super_admin' && (
-                      <motion.div
-                        key="right-super_admin"
-                        initial={{ opacity: 0, y: 10 }}
-                        animate={{ opacity: 1, y: 0 }}
-                        exit={{ opacity: 0, y: -10 }}
-                        transition={{ duration: 0.2, ease: "easeOut" }}
-                      >
-                        <NationalDashboard />
-                      </motion.div>
-                    )}
-                    {rightRole === 'hospital' && (
-                      <motion.div
-                        key="right-hospital"
-                        initial={{ opacity: 0, y: 10 }}
-                        animate={{ opacity: 1, y: 0 }}
-                        exit={{ opacity: 0, y: -10 }}
-                        transition={{ duration: 0.2, ease: "easeOut" }}
-                      >
-                        <HospitalDashboard />
-                      </motion.div>
-                    )}
-                    {rightRole === 'blood_bank' && (
-                      <motion.div
-                        key="right-blood_bank"
-                        initial={{ opacity: 0, y: 10 }}
-                        animate={{ opacity: 1, y: 0 }}
-                        exit={{ opacity: 0, y: -10 }}
-                        transition={{ duration: 0.2, ease: "easeOut" }}
-                      >
-                        <BloodBankDashboard />
-                      </motion.div>
-                    )}
-                    {rightRole === 'donor' && (
-                      <motion.div
-                        key="right-donor"
-                        initial={{ opacity: 0, y: 10 }}
-                        animate={{ opacity: 1, y: 0 }}
-                        exit={{ opacity: 0, y: -10 }}
-                        transition={{ duration: 0.2, ease: "easeOut" }}
-                      >
-                        <DonorDashboard />
-                      </motion.div>
-                    )}
-                  </AnimatePresence>
-                </div>
-              </div>
-
-            </div>
-
-            {/* Split Screen Live Map Integration */}
-            <div className="border-t border-slate-200 pt-6">
-              <h3 className="font-display font-extrabold text-slate-900 text-lg mb-4 flex items-center gap-2">
-                <Compass className="w-5 h-5 text-brand-red-600" /> Integrated Network GIS Mapping
-              </h3>
-              <LiveNetworkMap />
-            </div>
-
-          </div>
         ) : (
           /* Standard Fullscreen Portal Layout */
           <div className="space-y-6">
