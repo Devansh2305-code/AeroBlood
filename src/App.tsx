@@ -11,6 +11,7 @@ import DonorDashboard from './components/DonorDashboard';
 import AeroBloodLogo from './components/AeroBloodLogo';
 import PassportLookupView from './components/PassportLookupView';
 import AuthGatewayModal from './components/AuthGatewayModal';
+import AeroBloodAIAssistant from './components/AeroBloodAIAssistant';
 import { motion, AnimatePresence } from 'motion/react';
 import { 
   Compass, Building2, Droplet, Users, LayoutDashboard, 
@@ -271,6 +272,8 @@ export default function App() {
         defaultRole={authDefaultRole}
         defaultTab={authDefaultTab}
       />
+
+      <AeroBloodAIAssistant />
 
     </div>
   );

@@ -3,11 +3,28 @@ import path from "path";
 import { createServer as createViteServer } from "vite";
 import { createClient } from "@supabase/supabase-js";
 import dotenv from "dotenv";
+import { GoogleGenAI } from "@google/genai";
 
 dotenv.config();
 
 const supabaseUrl = process.env.SUPABASE_URL;
 const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_ANON_KEY;
+
+// Initialize Google GenAI client securely on the server-side
+const aiClient = process.env.GEMINI_API_KEY ? new GoogleGenAI({
+  apiKey: process.env.GEMINI_API_KEY,
+  httpOptions: {
+    headers: {
+      'User-Agent': 'aistudio-build',
+    }
+  }
+}) : null;
+
+if (aiClient) {
+  console.log("Gemini API Client initialized successfully from environment secrets.");
+} else {
+  console.log("Gemini API Client bypassed: GEMINI_API_KEY is not configured yet.");
+}
 
 let supabase: any = null;
 if (supabaseUrl && supabaseKey && supabaseUrl.startsWith("http")) {
@@ -141,6 +158,69 @@ async function startServer() {
 
   app.get("/api/health", (req, res) => {
     res.json({ status: "ok", synced: !!localSharedState, usingSupabase: !!supabase });
+  });
+
+  // Secure server-side endpoint for Gemini AI Companion
+  app.post("/api/gemini/chat", async (req, res) => {
+    const { message, history } = req.body;
+    if (!process.env.GEMINI_API_KEY) {
+      return res.status(500).json({ error: "Gemini API key is not configured on the server." });
+    }
+    if (!aiClient) {
+      return res.status(500).json({ error: "AI Client failed to initialize." });
+    }
+
+    try {
+      const systemInstruction = `
+You are AeroBlood AI, an intelligent co-pilot for the AeroBlood National Blood Grid Network.
+AeroBlood is a real-time blood intelligence platform that connects hospitals, blood banks, and donors in a seamless grid.
+
+Your role:
+- Answer medical, logistical, or blood-matching questions for clinicians, administrators, or prospective donors.
+- Advise on blood group compatibility (e.g., O- is universal donor of red cells, AB+ is universal recipient; opposite holds for plasma).
+- Educate on blood components shelf life (e.g., Platelets last 5 days; Packed Red Cells last 42 days; Fresh Frozen Plasma lasts 1 year).
+- Formulate hypothetical grid optimization plans and guide on donation safety guidelines (e.g., recovery intervals, travel restrictions).
+- Maintain a warm, extremely clear, clinical-grade, yet encouraging tone.
+- Keep answers brief, under 150 words, structured, and easy to read on small widget screens.
+`;
+
+      const chat = aiClient.chats.create({
+        model: "gemini-3.5-flash",
+        config: {
+          systemInstruction,
+          temperature: 0.7,
+        }
+      });
+
+      let responseText = "";
+      if (history && Array.isArray(history) && history.length > 0) {
+        const contents = history.map((turn: any) => ({
+          role: turn.role === "user" ? "user" : "model",
+          parts: [{ text: turn.text }]
+        }));
+        contents.push({
+          role: "user",
+          parts: [{ text: message }]
+        });
+
+        const result = await aiClient.models.generateContent({
+          model: "gemini-3.5-flash",
+          contents: contents,
+          config: {
+            systemInstruction,
+          }
+        });
+        responseText = result.text || "No response text was generated.";
+      } else {
+        const response = await chat.sendMessage({ message });
+        responseText = response.text || "No response text was generated.";
+      }
+
+      res.json({ text: responseText });
+    } catch (error: any) {
+      console.error("Gemini API server-side execution error:", error);
+      res.status(500).json({ error: error.message || "Failed to communicate with Gemini." });
+    }
   });
 
   // Vite middleware for development
