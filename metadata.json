@@ -1,0 +1,6 @@
+{
+  "name": "AeroBlood",
+  "description": "Cross-platform real-time blood intelligence network connecting hospitals, blood banks, and donors.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

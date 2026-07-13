@@ -1,0 +1,54 @@
+# =========================================================================
+# AeroBlood Project Git Ignorance Manifest
+# =========================================================================
+
+# Secrets & Environment Local variables
+.env
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+*.env
+
+# Dependencies & Package Managers
+node_modules/
+jspm_packages/
+.pnp
+.pnp.js
+
+# Build Outputs & Bundlers
+dist/
+build/
+.next/
+out/
+.docusaurus/
+.vuepress/dist/
+.serverless/
+bin/
+obj/
+
+# Testing & Quality Coverage Reports
+coverage/
+*.lcov
+.nyc_output/
+.eslintcache
+.stylelintcache
+
+# Logs and system run diagnostics
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+lerna-debug.log*
+*.log
+
+# Editor configurations and system clutter
+.idea/
+.vscode/
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.swp
+*.DS_Store
+Thumbs.db
