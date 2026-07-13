@@ -3,10 +3,16 @@ import { motion, AnimatePresence } from 'motion/react';
 import { 
   X, Lock, ShieldAlert, CheckCircle2, Building2, 
   Droplet, Users, MapPin, Phone, HelpCircle, 
-  Sparkles, ShieldCheck, ClipboardCheck, ArrowRight, Activity, Heart
+  Sparkles, ShieldCheck, ClipboardCheck, ArrowRight, Activity, Heart,
+  Mail, Key, Loader2
 } from 'lucide-react';
 import { useAeroBloodStore } from '../lib/store';
 import { UserRole, HospitalProfile, BloodBankProfile, DonorProfile } from '../types';
+import { auth } from '../lib/firebase';
+import { 
+  signInWithEmailAndPassword, 
+  createUserWithEmailAndPassword 
+} from 'firebase/auth';
 
 interface AuthGatewayModalProps {
   isOpen: boolean;
@@ -49,6 +55,12 @@ export default function AuthGatewayModal({ isOpen, onClose, defaultRole = 'donor
 
   // Success Feedback Toast
   const [successMsg, setSuccessMsg] = useState<string | null>(null);
+
+  // --- FIREBASE AUTHENTICATION STATE ---
+  const [useEmailAuth, setUseEmailAuth] = useState(false);
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [authLoading, setAuthLoading] = useState(false);
 
   // --- LOGIN STATE ---
   const [loginSearchId, setLoginSearchId] = useState('');
@@ -158,6 +170,53 @@ export default function AuthGatewayModal({ isOpen, onClose, defaultRole = 'donor
     }
   };
 
+  const handleFirebaseLogin = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setLoginError(null);
+    setAuthLoading(true);
+
+    try {
+      const userCredential = await signInWithEmailAndPassword(auth, email.trim(), password);
+      const uid = userCredential.user.uid;
+
+      if (selectedRole === 'hospital') {
+        const match = hospitals.find(h => h.id === uid);
+        if (match) {
+          setCurrentHospital(match.id);
+          setRole('hospital');
+          triggerSuccess(`Secure Firebase Login: ${match.name}`);
+        } else {
+          setLoginError(`Firebase account logged in, but no Hospital profile was found matching this account.`);
+        }
+      } else if (selectedRole === 'blood_bank') {
+        const match = bloodBanks.find(b => b.id === uid);
+        if (match) {
+          setCurrentBloodBank(match.id);
+          setRole('blood_bank');
+          triggerSuccess(`Secure Firebase Login: ${match.name}`);
+        } else {
+          setLoginError(`Firebase account logged in, but no Blood Bank profile was found matching this account.`);
+        }
+      } else if (selectedRole === 'donor') {
+        const match = donors.find(d => d.id === uid);
+        if (match) {
+          setCurrentDonor(match.id);
+          setRole('donor');
+          triggerSuccess(`Secure Passport unlocked: ${match.name}`);
+        } else {
+          setLoginError(`Firebase account logged in, but no Donor Passport profile was found matching this account.`);
+        }
+      } else if (selectedRole === 'super_admin') {
+        setLoginError(`Super Admin accounts must use physical hardware token handshake.`);
+      }
+    } catch (err: any) {
+      console.error(err);
+      setLoginError(err.message || "Failed to authenticate with Firebase.");
+    } finally {
+      setAuthLoading(false);
+    }
+  };
+
   // Fast Login Bypass from Quick Sandbox Selection
   const handleQuickSandboxLogin = (id: string, role: UserRole) => {
     setLoginError(null);
@@ -190,64 +249,98 @@ export default function AuthGatewayModal({ isOpen, onClose, defaultRole = 'donor
   };
 
   // Form Submissions for Registrations
-  const handleRegisterSubmit = (e: React.FormEvent) => {
+  const handleRegisterSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
-    const coords = generateMidwestCoords();
+    if (!email || !password) {
+      alert("Please provide an email and password for secure Firebase Authentication registration.");
+      return;
+    }
 
-    if (selectedRole === 'hospital') {
-      if (!hospName.trim() || !hospAddress.trim() || !hospIdNumber.trim()) {
-        alert("Please fill in all mandatory Hospital terminal fields.");
-        return;
-      }
-      registerHospital({
-        name: hospName.trim(),
-        location: { address: hospAddress.trim(), ...coords },
-        hospitalType: hospType,
-        emergencyContact: hospContact.trim() || '+1 (555) 000-1111',
-        hospitalIdType: hospIdType,
-        hospitalIdNumber: hospIdNumber.trim().toUpperCase(),
-        resources: {
-          bedCount: Number(hospBeds) || 50,
-          totalDoctors: Number(hospDoctors) || 10,
-          icuCount: Number(hospIcu) || 4,
-          roomCount: Number(hospRooms) || 30,
-          opdAvailable: hospOpd
+    if (password.length < 6) {
+      alert("Password must be at least 6 characters.");
+      return;
+    }
+
+    setAuthLoading(true);
+    try {
+      const coords = generateMidwestCoords();
+
+      if (selectedRole === 'hospital') {
+        if (!hospName.trim() || !hospAddress.trim() || !hospIdNumber.trim()) {
+          alert("Please fill in all mandatory Hospital terminal fields.");
+          setAuthLoading(false);
+          return;
         }
-      });
-      triggerSuccess(`Hospital Node registered and live! Terminal: ${hospName}`);
-    } else if (selectedRole === 'blood_bank') {
-      if (!bankName.trim() || !bankAddress.trim() || !bankRaktkosh.trim()) {
-        alert("Please fill in all mandatory Blood Bank registration fields.");
-        return;
+
+        const userCredential = await createUserWithEmailAndPassword(auth, email.trim(), password);
+        const uid = userCredential.user.uid;
+
+        registerHospital({
+          name: hospName.trim(),
+          location: { address: hospAddress.trim(), ...coords },
+          hospitalType: hospType,
+          emergencyContact: hospContact.trim() || '+1 (555) 000-1111',
+          hospitalIdType: hospIdType,
+          hospitalIdNumber: hospIdNumber.trim().toUpperCase(),
+          resources: {
+            bedCount: Number(hospBeds) || 50,
+            totalDoctors: Number(hospDoctors) || 10,
+            icuCount: Number(hospIcu) || 4,
+            roomCount: Number(hospRooms) || 30,
+            opdAvailable: hospOpd
+          }
+        }, uid);
+        triggerSuccess(`Hospital Node registered and live with Firebase Auth! Terminal: ${hospName}`);
+      } else if (selectedRole === 'blood_bank') {
+        if (!bankName.trim() || !bankAddress.trim() || !bankRaktkosh.trim()) {
+          alert("Please fill in all mandatory Blood Bank registration fields.");
+          setAuthLoading(false);
+          return;
+        }
+
+        const userCredential = await createUserWithEmailAndPassword(auth, email.trim(), password);
+        const uid = userCredential.user.uid;
+
+        registerBloodBank({
+          name: bankName.trim(),
+          location: { address: bankAddress.trim(), ...coords },
+          bankType: bankType,
+          emergencyContact: bankContact.trim() || '+1 (555) 000-2222',
+          eRaktkoshId: bankRaktkosh.trim().toUpperCase()
+        }, uid);
+        triggerSuccess(`Blood Bank online with Firebase Auth! Node: ${bankName}`);
+      } else if (selectedRole === 'donor') {
+        if (!donorName.trim() || !donorPhone.trim() || !donorAddress.trim()) {
+          alert("Please complete the required Digital Passport profile fields.");
+          setAuthLoading(false);
+          return;
+        }
+        if (donorAge < 18 || donorAge > 65) {
+          alert("Donors must be between 18 and 65 years of age to register under current regulations.");
+          setAuthLoading(false);
+          return;
+        }
+
+        const userCredential = await createUserWithEmailAndPassword(auth, email.trim(), password);
+        const uid = userCredential.user.uid;
+
+        registerDonor({
+          name: donorName.trim(),
+          phone: donorPhone.trim(),
+          bloodGroup: donorBloodGroup,
+          age: Number(donorAge),
+          gender: donorGender,
+          location: { address: donorAddress.trim(), ...coords },
+          medicalHistory: medicalHistory
+        }, uid);
+        triggerSuccess(`Blood Passport and Firebase account issued! Welcome, ${donorName}`);
       }
-      registerBloodBank({
-        name: bankName.trim(),
-        location: { address: bankAddress.trim(), ...coords },
-        bankType: bankType,
-        emergencyContact: bankContact.trim() || '+1 (555) 000-2222',
-        eRaktkoshId: bankRaktkosh.trim().toUpperCase()
-      });
-      triggerSuccess(`Blood Bank online on the Grid! Node: ${bankName}`);
-    } else if (selectedRole === 'donor') {
-      if (!donorName.trim() || !donorPhone.trim() || !donorAddress.trim()) {
-        alert("Please complete the required Digital Passport profile fields.");
-        return;
-      }
-      if (donorAge < 18 || donorAge > 65) {
-        alert("Donors must be between 18 and 65 years of age to register under current regulations.");
-        return;
-      }
-      registerDonor({
-        name: donorName.trim(),
-        phone: donorPhone.trim(),
-        bloodGroup: donorBloodGroup,
-        age: Number(donorAge),
-        gender: donorGender,
-        location: { address: donorAddress.trim(), ...coords },
-        medicalHistory: medicalHistory
-      });
-      triggerSuccess(`Blood Passport issued successfully! Welcome, ${donorName}`);
+    } catch (err: any) {
+      console.error(err);
+      alert("Registration failed: " + (err.message || "Unknown error creating Firebase account."));
+    } finally {
+      setAuthLoading(false);
     }
   };
 
@@ -384,41 +477,113 @@ export default function AuthGatewayModal({ isOpen, onClose, defaultRole = 'donor
             {/* TAB 1: SIGN IN */}
             {activeTab === 'login' && (
               <div className="space-y-6">
-                <form onSubmit={handleLoginSubmit} className="space-y-4">
-                  <div className="space-y-2">
-                    <label className="block text-xs font-bold text-slate-700">
-                      {selectedRole === 'hospital' && 'Hospital Code / National License ID'}
-                      {selectedRole === 'blood_bank' && 'e-Raktkosh Registry Identifier'}
-                      {selectedRole === 'donor' && 'Digital Blood Passport ID or Registered Phone'}
-                      {selectedRole === 'super_admin' && 'National System Clearance Token'}
-                    </label>
-                    <div className="relative">
-                      <input
-                        type="text"
-                        value={loginSearchId}
-                        onChange={(e) => setLoginSearchId(e.target.value)}
-                        placeholder={
-                          selectedRole === 'hospital' ? 'e.g. HOSP-1 or NH-981273-A' :
-                          selectedRole === 'blood_bank' ? 'e.g. BANK-1 or ER-IL-CH-8821' :
-                          selectedRole === 'donor' ? 'e.g. DONOR-1 or +1 (555) 888-9999' :
-                          'Enter clearance token...'
-                        }
-                        className="w-full pl-3 pr-24 py-2.5 text-xs border border-slate-300 rounded-xl focus:outline-none focus:ring-1 focus:ring-brand-red-500 font-mono uppercase bg-slate-50"
-                      />
+                <div className="flex items-center justify-between border-b border-slate-100 pb-2">
+                  <span className="text-xs font-bold text-slate-800">Authentication Mode</span>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setUseEmailAuth(!useEmailAuth);
+                      setLoginError(null);
+                    }}
+                    className="text-xs text-brand-red-600 hover:text-brand-red-700 font-bold flex items-center gap-1 cursor-pointer"
+                  >
+                    {useEmailAuth ? "Use Access Code Lookup" : "Use Firebase Email/Password"}
+                  </button>
+                </div>
+
+                {useEmailAuth ? (
+                  <form onSubmit={handleFirebaseLogin} className="space-y-4">
+                    <div className="space-y-3">
+                      <div className="space-y-1">
+                        <label className="block text-xs font-bold text-slate-700">Account Email Address *</label>
+                        <div className="relative">
+                          <Mail className="w-4 h-4 text-slate-400 absolute left-3 top-3.5" />
+                          <input
+                            type="email"
+                            required
+                            value={email}
+                            onChange={(e) => setEmail(e.target.value)}
+                            placeholder="node@aeroblood.org"
+                            className="w-full pl-9 pr-3 py-2.5 text-xs border border-slate-300 rounded-xl focus:outline-none focus:ring-1 focus:ring-brand-red-500 bg-slate-50"
+                          />
+                        </div>
+                      </div>
+
+                      <div className="space-y-1">
+                        <label className="block text-xs font-bold text-slate-700">Account Password *</label>
+                        <div className="relative">
+                          <Key className="w-4 h-4 text-slate-400 absolute left-3 top-3.5" />
+                          <input
+                            type="password"
+                            required
+                            value={password}
+                            onChange={(e) => setPassword(e.target.value)}
+                            placeholder="••••••••"
+                            className="w-full pl-9 pr-3 py-2.5 text-xs border border-slate-300 rounded-xl focus:outline-none focus:ring-1 focus:ring-brand-red-500 bg-slate-50"
+                          />
+                        </div>
+                      </div>
+
                       <button
                         type="submit"
-                        className="absolute right-1.5 top-1.5 bottom-1.5 bg-slate-900 hover:bg-slate-800 text-white font-bold text-[10px] px-3 rounded-lg transition-all flex items-center gap-1 cursor-pointer"
+                        disabled={authLoading}
+                        className="w-full py-2.5 bg-slate-900 hover:bg-slate-800 text-white font-extrabold text-xs rounded-xl transition-all flex items-center justify-center gap-1.5 cursor-pointer disabled:opacity-50"
                       >
-                        Handshake <ArrowRight className="w-3 h-3" />
+                        {authLoading ? (
+                          <>
+                            <Loader2 className="w-4 h-4 animate-spin" /> Authorizing Terminal...
+                          </>
+                        ) : (
+                          <>
+                            Sign In with Firebase Auth <ArrowRight className="w-4 h-4" />
+                          </>
+                        )}
                       </button>
+
+                      {loginError && (
+                        <p className="text-xs text-brand-red-600 font-medium flex items-center gap-1.5 pt-1">
+                          <ShieldAlert className="w-4 h-4 shrink-0" /> {loginError}
+                        </p>
+                      )}
                     </div>
-                    {loginError && (
-                      <p className="text-xs text-brand-red-600 font-medium flex items-center gap-1.5 pt-1">
-                        <ShieldAlert className="w-4 h-4 shrink-0" /> {loginError}
-                      </p>
-                    )}
-                  </div>
-                </form>
+                  </form>
+                ) : (
+                  <form onSubmit={handleLoginSubmit} className="space-y-4">
+                    <div className="space-y-2">
+                      <label className="block text-xs font-bold text-slate-700">
+                        {selectedRole === 'hospital' && 'Hospital Code / National License ID'}
+                        {selectedRole === 'blood_bank' && 'e-Raktkosh Registry Identifier'}
+                        {selectedRole === 'donor' && 'Digital Blood Passport ID or Registered Phone'}
+                        {selectedRole === 'super_admin' && 'National System Clearance Token'}
+                      </label>
+                      <div className="relative">
+                        <input
+                          type="text"
+                          value={loginSearchId}
+                          onChange={(e) => setLoginSearchId(e.target.value)}
+                          placeholder={
+                            selectedRole === 'hospital' ? 'e.g. HOSP-1 or NH-981273-A' :
+                            selectedRole === 'blood_bank' ? 'e.g. BANK-1 or ER-IL-CH-8821' :
+                            selectedRole === 'donor' ? 'e.g. DONOR-1 or +1 (555) 888-9999' :
+                            'Enter clearance token...'
+                          }
+                          className="w-full pl-3 pr-24 py-2.5 text-xs border border-slate-300 rounded-xl focus:outline-none focus:ring-1 focus:ring-brand-red-500 font-mono uppercase bg-slate-50"
+                        />
+                        <button
+                          type="submit"
+                          className="absolute right-1.5 top-1.5 bottom-1.5 bg-slate-900 hover:bg-slate-800 text-white font-bold text-[10px] px-3 rounded-lg transition-all flex items-center gap-1 cursor-pointer"
+                        >
+                          Handshake <ArrowRight className="w-3 h-3" />
+                        </button>
+                      </div>
+                      {loginError && (
+                        <p className="text-xs text-brand-red-600 font-medium flex items-center gap-1.5 pt-1">
+                          <ShieldAlert className="w-4 h-4 shrink-0" /> {loginError}
+                        </p>
+                      )}
+                    </div>
+                  </form>
+                )}
 
                 {/* Quick Sandboxes list for ease of simulation */}
                 <div className="bg-slate-50 border border-slate-100 p-4 rounded-xl space-y-3">
@@ -489,6 +654,44 @@ export default function AuthGatewayModal({ isOpen, onClose, defaultRole = 'donor
             {activeTab === 'register' && (
               <form onSubmit={handleRegisterSubmit} className="space-y-4 text-xs">
                 
+                {/* FIREBASE ACCOUNT SECURITY DETAILS */}
+                <div className="bg-slate-50 border border-slate-200 p-4 rounded-xl space-y-3">
+                  <h5 className="font-bold text-slate-800 flex items-center gap-1.5 text-xs border-b border-slate-200 pb-1.5">
+                    <Lock className="w-4 h-4 text-brand-red-600 shrink-0" /> Firebase Auth Security Clearance
+                  </h5>
+                  <p className="text-[10px] text-slate-500 font-mono leading-tight">These credentials secure your profile on the national network and allow you to log in from any node terminal.</p>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                    <div className="space-y-1">
+                      <label className="font-bold text-slate-700 block">Security Account Email *</label>
+                      <div className="relative">
+                        <Mail className="w-4 h-4 text-slate-400 absolute left-2.5 top-2.5" />
+                        <input
+                          type="email"
+                          required
+                          value={email}
+                          onChange={(e) => setEmail(e.target.value)}
+                          placeholder="e.g. administrator@aeroblood.org"
+                          className="w-full border border-slate-300 rounded-lg p-2 pl-8 bg-white focus:outline-none focus:ring-1 focus:ring-brand-red-500 text-xs"
+                        />
+                      </div>
+                    </div>
+                    <div className="space-y-1">
+                      <label className="font-bold text-slate-700 block">Access Password (6+ characters) *</label>
+                      <div className="relative">
+                        <Key className="w-4 h-4 text-slate-400 absolute left-2.5 top-2.5" />
+                        <input
+                          type="password"
+                          required
+                          value={password}
+                          onChange={(e) => setPassword(e.target.value)}
+                          placeholder="••••••••"
+                          className="w-full border border-slate-300 rounded-lg p-2 pl-8 bg-white focus:outline-none focus:ring-1 focus:ring-brand-red-500 text-xs"
+                        />
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
                 {/* HOSPITAL REGISTRATION FORM */}
                 {selectedRole === 'hospital' && (
                   <div className="space-y-4">
@@ -849,9 +1052,18 @@ export default function AuthGatewayModal({ isOpen, onClose, defaultRole = 'donor
 
                 <button
                   type="submit"
-                  className="w-full py-3 px-4 font-extrabold text-white bg-slate-900 hover:bg-slate-800 rounded-xl transition-all shadow-md flex items-center justify-center gap-2 cursor-pointer mt-4"
+                  disabled={authLoading}
+                  className="w-full py-3 px-4 font-extrabold text-white bg-slate-900 hover:bg-slate-800 rounded-xl transition-all shadow-md flex items-center justify-center gap-2 cursor-pointer mt-4 disabled:opacity-50"
                 >
-                  Confirm Registration & Launch Node <ArrowRight className="w-4 h-4" />
+                  {authLoading ? (
+                    <>
+                      <Loader2 className="w-5 h-5 animate-spin" /> Provisioning Node Credentials...
+                    </>
+                  ) : (
+                    <>
+                      Confirm Registration & Launch Node <ArrowRight className="w-4 h-4" />
+                    </>
+                  )}
                 </button>
               </form>
             )}

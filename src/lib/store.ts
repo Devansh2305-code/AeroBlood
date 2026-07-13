@@ -44,10 +44,10 @@ interface AeroBloodStore {
   removeBloodUnit: (id: string) => void;
   
   // Donor Actions
-  registerDonor: (donor: Omit<DonorProfile, 'id' | 'points' | 'donorId'>) => void;
+  registerDonor: (donor: Omit<DonorProfile, 'id' | 'points' | 'donorId'>, customId?: string) => void;
   donateBlood: (donorId: string, locationName: string) => void;
-  registerHospital: (hospital: Omit<HospitalProfile, 'id'>) => void;
-  registerBloodBank: (bloodBank: Omit<BloodBankProfile, 'id'>) => void;
+  registerHospital: (hospital: Omit<HospitalProfile, 'id'>, customId?: string) => void;
+  registerBloodBank: (bloodBank: Omit<BloodBankProfile, 'id'>, customId?: string) => void;
   
   // Camp Actions
   addDonationCamp: (camp: Omit<DonationCamp, 'id'>) => void;
@@ -438,10 +438,10 @@ export const useAeroBloodStore = create<AeroBloodStore>((set, get) => ({
   },
 
   // DONOR ACTIONS
-  registerDonor: (donor) => {
+  registerDonor: (donor, customId) => {
     const newDonor: DonorProfile = {
       ...donor,
-      id: 'DONOR-' + genId(),
+      id: customId || ('DONOR-' + genId()),
       points: 100, // starting points
       donorId: 'AB-' + Math.floor(1000 + Math.random() * 9000) + '-' + donor.name.charAt(0).toUpperCase()
     };
@@ -463,10 +463,10 @@ export const useAeroBloodStore = create<AeroBloodStore>((set, get) => ({
     }));
   },
 
-  registerHospital: (hospital) => {
+  registerHospital: (hospital, customId) => {
     const newHospital: HospitalProfile = {
       ...hospital,
-      id: 'HOSP-' + genId()
+      id: customId || ('HOSP-' + genId())
     };
     set((state) => ({
       hospitals: [newHospital, ...state.hospitals],
@@ -475,10 +475,10 @@ export const useAeroBloodStore = create<AeroBloodStore>((set, get) => ({
     }));
   },
 
-  registerBloodBank: (bloodBank) => {
+  registerBloodBank: (bloodBank, customId) => {
     const newBloodBank: BloodBankProfile = {
       ...bloodBank,
-      id: 'BANK-' + genId()
+      id: customId || ('BANK-' + genId())
     };
     set((state) => ({
       bloodBanks: [newBloodBank, ...state.bloodBanks],
